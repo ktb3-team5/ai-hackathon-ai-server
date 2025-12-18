@@ -11,6 +11,7 @@ venv/
 .gitignore
 .github
 *.md
+README.md
 .pytest_cache
 .coverage
 htmlcov/
@@ -23,3 +24,5 @@ logs/
 *.log
 .idea/
 .vscode/
+test.py
+insert_sample_data.py

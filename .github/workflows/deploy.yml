@@ -13,18 +13,26 @@ jobs:
     - name: 📥 코드 체크아웃
       uses: actions/checkout@v4
 
-    - name: 🔑 SSH 설정
+    - name: 🔑 SSH 설정 (KeepAlive 포함)
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        
+        # SSH 연결 유지 설정
+        cat >> ~/.ssh/config << EOF
+        Host ${{ secrets.EC2_HOST }}
+          ServerAliveInterval 60
+          ServerAliveCountMax 10
+          TCPKeepAlive yes
+        EOF
 
     - name: 📦 EC2로 파일 전송
       run: |
         echo "파일 전송 시작..."
         rsync -avz --delete \
-          -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+          -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ServerAliveInterval=60" \
           --exclude='.git' \
           --exclude='.github' \
           --exclude='chroma_db' \
@@ -37,7 +45,11 @@ jobs:
 
     - name: 🚀 EC2에서 배포 실행
       run: |
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+        ssh -i ~/.ssh/id_rsa \
+          -o StrictHostKeyChecking=no \
+          -o ServerAliveInterval=60 \
+          -o ServerAliveCountMax=10 \
+          -o TCPKeepAlive=yes \
           ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
           set -e
           
@@ -47,39 +59,57 @@ jobs:
           echo "🚀 AI 서버 배포 시작"
           echo "=========================================="
           
-          # 기존 컨테이너 중지 및 제거
+          # Docker Compose 명령어 확인
+          if command -v docker-compose &> /dev/null; then
+            DOCKER_COMPOSE="docker-compose"
+          elif docker compose version &> /dev/null; then
+            DOCKER_COMPOSE="docker compose"
+          else
+            echo "❌ Docker Compose를 찾을 수 없습니다!"
+            echo "설치 명령어:"
+            echo "sudo curl -L 'https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-\$(uname -s)-\$(uname -m)' -o /usr/local/bin/docker-compose"
+            echo "sudo chmod +x /usr/local/bin/docker-compose"
+            exit 1
+          fi
+          
+          echo "✅ Docker Compose: $DOCKER_COMPOSE"
+          
+          # 기존 컨테이너 중지
           echo "⏹️  기존 컨테이너 중지 중..."
-          docker-compose down || true
+          $DOCKER_COMPOSE down || true
           
-          # 이미지 빌드 (캐시 활용)
-          echo "🔨 Docker 이미지 빌드 중..."
-          docker-compose build
+          # Docker 이미지 빌드
+          echo "🔨 Docker 이미지 빌드 중... (5-10분 소요)"
+          $DOCKER_COMPOSE build
           
-          # ChromaDB 데이터 초기화 (첫 배포 시에만)
+          echo "✅ 빌드 완료!"
+          
+          # ChromaDB 초기화 (첫 배포 시에만)
           if [ ! -d "./chroma_db" ] || [ -z "$(ls -A ./chroma_db 2>/dev/null)" ]; then
             echo "📦 ChromaDB 초기화 중..."
-            docker-compose run --rm ai-server python init_chroma_from_sql.py
+            $DOCKER_COMPOSE run --rm ai-server python init_chroma_from_sql.py
             echo "✅ ChromaDB 초기화 완료"
           else
-            echo "✅ ChromaDB 데이터가 이미 존재합니다"
+            echo "✅ ChromaDB 데이터 존재 (초기화 건너뜀)"
           fi
           
           # 컨테이너 시작
           echo "▶️  컨테이너 시작 중..."
-          docker-compose up -d
+          $DOCKER_COMPOSE up -d
           
-          # 잠시 대기
+          # 서버 시작 대기
           echo "⏳ 서버 시작 대기 중..."
           sleep 15
           
           # 로그 확인
+          echo ""
           echo "📋 최근 로그:"
-          docker-compose logs --tail=30
+          $DOCKER_COMPOSE logs --tail=30
           
-          # 컨테이너 상태 확인
+          # 컨테이너 상태
           echo ""
           echo "📊 컨테이너 상태:"
-          docker-compose ps
+          $DOCKER_COMPOSE ps
           
           echo ""
           echo "=========================================="
@@ -92,24 +122,39 @@ jobs:
         echo "헬스 체크 중..."
         sleep 10
         
-        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:8000/health || echo "000")
+        for i in {1..5}; do
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:8000/health || echo "000")
+          
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ 서버가 정상 작동 중입니다!"
+            curl -s http://${{ secrets.EC2_HOST }}:8000/health | jq '.' || curl -s http://${{ secrets.EC2_HOST }}:8000/health
+            exit 0
+          else
+            echo "⏳ 시도 $i/5: 서버 응답 대기 중... (HTTP $RESPONSE)"
+            sleep 10
+          fi
+        done
         
-        if [ "$RESPONSE" = "200" ]; then
-          echo "✅ 서버가 정상적으로 작동 중입니다!"
-          curl -s http://${{ secrets.EC2_HOST }}:8000/health | jq '.' || curl -s http://${{ secrets.EC2_HOST }}:8000/health
-        else
-          echo "❌ 서버 응답 실패 (HTTP $RESPONSE)"
-          exit 1
-        fi
+        echo "❌ 서버 응답 실패"
+        echo "💡 EC2에서 로그를 확인하세요: docker-compose logs -f"
+        exit 1
 
-    - name: 📢 배포 결과 알림
+    - name: 📢 배포 결과
       if: always()
       run: |
         if [ "${{ job.status }}" = "success" ]; then
+          echo ""
+          echo "=========================================="
           echo "🎉 배포 성공!"
-          echo "서버 주소: http://${{ secrets.EC2_HOST }}:8000"
-          echo "API 문서: http://${{ secrets.EC2_HOST }}:8000/docs"
-          echo "헬스 체크: http://${{ secrets.EC2_HOST }}:8000/health"
+          echo "=========================================="
+          echo ""
+          echo "📍 서버 주소:"
+          echo "   - API: http://${{ secrets.EC2_HOST }}:8000"
+          echo "   - 문서: http://${{ secrets.EC2_HOST }}:8000/docs"
+          echo "   - 헬스: http://${{ secrets.EC2_HOST }}:8000/health"
+          echo ""
+          echo "=========================================="
         else
           echo "❌ 배포 실패"
+          echo "로그를 확인하세요."
         fi

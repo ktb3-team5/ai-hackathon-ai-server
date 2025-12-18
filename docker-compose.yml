@@ -17,7 +17,7 @@ services:
       - CHROMA_COLLECTION_NAME=travel_places
       - EMBEDDING_MODEL=jhgan/ko-sroberta-multitask
     volumes:
-      # ChromaDB 데이터 영구 저장 (컨테이너 재시작해도 데이터 유지)
+      # ChromaDB 데이터 영구 저장
       - ./chroma_db:/app/chroma_db
       # 로그 저장 (선택사항)
       - ./logs:/app/logs
