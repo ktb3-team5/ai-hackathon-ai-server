@@ -58,7 +58,7 @@ class ChromaDBService:
             metadatas=metadatas
         )
 
-    def search_places(self, search_request: SearchRequest, n_results: int = 100) -> list[int]:
+    def search_places(self, search_request: SearchRequest, n_results: int = 5) -> list[int]:
         """태그 기반 유사도 검색"""
         query_text = " ".join(search_request.tags)
 
