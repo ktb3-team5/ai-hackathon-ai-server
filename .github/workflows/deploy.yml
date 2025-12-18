@@ -227,20 +227,35 @@ jobs:
           echo "✅ 빌드 완료! (소요 시간: ${BUILD_MIN}분 ${BUILD_SEC}초)"
           
           # ==========================================
-          # 📦 5단계: ChromaDB 초기화
+          # 📦 5단계: ChromaDB 초기화 (SQL → Vector DB)
           # ==========================================
           echo ""
           echo "================================================"
-          echo "📦 5단계: ChromaDB 초기화"
+          echo "📦 5단계: ChromaDB 초기화 (SQL → Vector DB)"
           echo "================================================"
           echo ""
           
+          # chroma_db 디렉토리 생성 (없을 경우)
+          mkdir -p ./chroma_db
+          
+          # ChromaDB가 비어있거나 없으면 초기화
           if [ ! -d "./chroma_db" ] || [ -z "$(ls -A ./chroma_db 2>/dev/null)" ]; then
-            echo "📦 ChromaDB 초기화 중..."
+            echo "📦 ChromaDB가 비어있음. SQL 데이터로 초기화 중..."
+            echo "   - init.sql 파일에서 여행지 데이터 파싱"
+            echo "   - 벡터 임베딩 생성 및 저장"
+            echo "   - 예상 소요 시간: 2-3분"
+            echo ""
+            
             $DOCKER_COMPOSE run --rm ai-server python init_chroma_from_sql.py
-            echo "✅ ChromaDB 초기화 완료"
+            
+            echo ""
+            echo "✅ ChromaDB 초기화 완료!"
           else
-            echo "✅ ChromaDB 데이터 존재 (초기화 건너뜀)"
+            echo "✅ ChromaDB 데이터 존재"
+            echo ""
+            echo "💡 기존 데이터를 유지합니다."
+            echo "   데이터를 재생성하려면 chroma_db 폴더를 삭제하세요:"
+            echo "   rm -rf ./chroma_db/*"
           fi
           
           # ==========================================

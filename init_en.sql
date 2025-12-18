@@ -71,7 +71,7 @@ INSERT INTO tb_destination (media_id, name, address, description, tags, image_ur
                                                                              'yellow,retro,usedbooks,warm,moodphoto,alleytrip,modest,heartflutter', '인천한미서점'),
                                                                             (1, 'Deoksugung Stone Wall Path', '99 Sejong-daero, Jung-gu, Seoul',
                                                                              'The place where the Goblin and the Grim Reaper first met, and where the entrance to the Grim Reapers tea house was located, showcasing Korean beauty',
-                                                                             'autumn,fallfoliage,stonewallpath,walkingcourse,classic,grimreaperteahouse,atmospheric,seoultour', NULL),
+                                                                             'autumn,fallfoliage,stonewallpath,walkingcourse,classic,grimreaperteahouse,atmospheric,seoultour', '덕수궁돌담길'),
                                                                             (1, 'Pyeongchang Woljeongsa Fir Forest Trail', '374-8 Odaesan-ro, Jinbu-myeon, Pyeongchang-gun, Gangwon-do',
                                                                              'The beautiful forest path where Kim Shin confirmed his love to Ji Eun-tak while revealing the truth about his sword in the snow',
                                                                              'snowing,forestpath,winterkingdom,majestic,meditation,pristine,beautiflysad,trekking', '평창월정사전나무숲길'),
