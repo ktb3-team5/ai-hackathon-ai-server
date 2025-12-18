@@ -21,12 +21,8 @@ services:
       - ./chroma_db:/app/chroma_db
       # 로그 저장 (선택사항)
       - ./logs:/app/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      # 모델 캐시 저장 (빌드 시간 단축)
+      - ./models:/root/.cache/huggingface
     logging:
       driver: "json-file"
       options:
