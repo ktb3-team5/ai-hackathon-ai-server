@@ -18,6 +18,7 @@ CREATE TABLE tb_user (
 CREATE TABLE tb_media (
                           id    BIGINT NOT NULL AUTO_INCREMENT,
                           title VARCHAR(255) NOT NULL,
+                          media_url VARCHAR(1000) NULL,
                           PRIMARY KEY (id),
                           UNIQUE KEY uk_tb_media_title (title)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -43,7 +44,7 @@ INSERT INTO tb_user (session_id, tags) VALUES
                                            ('sess_demo_001', 'romantic,ocean,walk'),
                                            ('sess_demo_002', 'urban,nightview,cafe');
 
-INSERT INTO tb_media (id, title) VALUES
+INSERT INTO tb_media (id, title, media_url) VALUES
                                      (1, 'Guardian: The Lonely and Great God', '도깨비'),
                                      (2, 'K-Pop Demon Hunters', '케데헌'),
                                      (3, 'Mr. Sunshine', '미스터션샤인'),
