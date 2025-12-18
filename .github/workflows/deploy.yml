@@ -1,0 +1,140 @@
+name: Deploy AI Server to EC2
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 코드 체크아웃
+      uses: actions/checkout@v4
+
+    - name: 🔑 SSH 설정 (KeepAlive 포함)
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        
+        # SSH 연결 유지 설정
+        cat >> ~/.ssh/config << EOF
+        Host ${{ secrets.EC2_HOST }}
+          ServerAliveInterval 60
+          ServerAliveCountMax 10
+          TCPKeepAlive yes
+        EOF
+
+    - name: 📦 EC2로 파일 전송
+      run: |
+        echo "파일 전송 시작..."
+        rsync -avz --delete \
+          -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ServerAliveInterval=60" \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='chroma_db' \
+          --exclude='logs' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='.env' \
+          ./ ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:~/ai-hackathon-ai-server/
+        echo "✅ 파일 전송 완료"
+
+    - name: 🚀 EC2에서 배포 실행
+      run: |
+        ssh -i ~/.ssh/id_rsa \
+          -o StrictHostKeyChecking=no \
+          -o ServerAliveInterval=60 \
+          -o ServerAliveCountMax=10 \
+          -o TCPKeepAlive=yes \
+          ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
+          set -e
+          
+          cd ~/ai-hackathon-ai-server
+          
+          echo "=========================================="
+          echo "🚀 AI 서버 배포 시작"
+          echo "=========================================="
+          
+          # Docker Compose 명령어 확인
+          if command -v docker-compose &> /dev/null; then
+            DOCKER_COMPOSE="docker-compose"
+          elif docker compose version &> /dev/null; then
+            DOCKER_COMPOSE="docker compose"
+          else
+            echo "❌ Docker Compose를 찾을 수 없습니다!"
+            exit 1
+          fi
+          
+          echo "✅ Docker Compose: $DOCKER_COMPOSE"
+          
+          # 기존 컨테이너 중지
+          echo "⏹️  기존 컨테이너 중지 중..."
+          $DOCKER_COMPOSE down || true
+          
+          # Docker 이미지 빌드
+          echo "🔨 Docker 이미지 빌드 중... (5-10분 소요)"
+          $DOCKER_COMPOSE build
+          
+          echo "✅ 빌드 완료!"
+          
+          # ChromaDB 초기화 (첫 배포 시에만)
+          if [ ! -d "./chroma_db" ] || [ -z "$(ls -A ./chroma_db 2>/dev/null)" ]; then
+            echo "📦 ChromaDB 초기화 중..."
+            $DOCKER_COMPOSE run --rm ai-server python init_chroma_from_sql.py
+            echo "✅ ChromaDB 초기화 완료"
+          else
+            echo "✅ ChromaDB 데이터 존재 (초기화 건너뜀)"
+          fi
+          
+          # 컨테이너 시작
+          echo "▶️  컨테이너 시작 중..."
+          $DOCKER_COMPOSE up -d
+          
+          # 서버 시작 대기
+          echo "⏳ 서버 시작 대기 중..."
+          sleep 15
+          
+          # 로그 확인
+          echo ""
+          echo "📋 최근 로그:"
+          $DOCKER_COMPOSE logs --tail=30
+          
+          # 컨테이너 상태
+          echo ""
+          echo "📊 컨테이너 상태:"
+          $DOCKER_COMPOSE ps
+          
+          echo ""
+          echo "=========================================="
+          echo "✅ 배포 완료!"
+          echo "=========================================="
+          echo ""
+          echo "📍 서버 접속 정보:"
+          echo "   - API: http://3.34.178.178:8000"
+          echo "   - 문서: http://3.34.178.178:8000/docs"
+          echo "   - 헬스: http://3.34.178.178:8000/health"
+          echo ""
+          echo "💡 서버 확인: curl http://3.34.178.178:8000/health"
+          echo "💡 로그 확인: docker-compose logs -f"
+          echo ""
+        ENDSSH
+
+    - name: 📢 배포 완료
+      run: |
+        echo ""
+        echo "=========================================="
+        echo "🎉 배포 성공!"
+        echo "=========================================="
+        echo ""
+        echo "서버가 시작되었습니다."
+        echo "수동으로 확인해주세요:"
+        echo ""
+        echo "  curl http://${{ secrets.EC2_HOST }}:8000/health"
+        echo ""
+        echo "또는 브라우저에서:"
+        echo "  http://${{ secrets.EC2_HOST }}:8000/docs"
+        echo ""
