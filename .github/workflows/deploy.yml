@@ -2,7 +2,7 @@ name: Deploy AI Server to EC2
 
 on:
   push:
-    branches: [ feat/cicd ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
