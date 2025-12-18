@@ -11,7 +11,7 @@ def parse_sql_insert_values(sql_content: str) -> list[tuple]:
     SQL INSERT 문에서 VALUES 부분을 파싱하여 데이터 추출
 
     Returns:
-        List of tuples: (media_id, name, address, description, tags)
+        List of tuples: (media_id, name, address, description, tags, image_url)
     """
     # INSERT INTO tb_destination로 시작하는 부분 찾기
     pattern = r'INSERT INTO tb_destination.*?VALUES\s+(.*?);'
@@ -55,21 +55,28 @@ def parse_sql_insert_values(sql_content: str) -> list[tuple]:
             if current_value.strip():
                 values.append(current_value.strip())
 
-            # 값이 5개인 경우만 처리 (media_id, name, address, description, tags)
-            if len(values) == 5:
+            # 값이 5개 또는 6개인 경우 처리 (media_id, name, address, description, tags, [image_url])
+            if len(values) >= 5:
                 media_id = int(values[0].strip())
                 name = values[1].strip().strip('"').strip("'")
                 address = values[2].strip().strip('"').strip("'")
                 description = values[3].strip().strip('"').strip("'")
                 tags = values[4].strip().strip('"').strip("'")
 
-                all_destinations.append((media_id, name, address, description, tags))
+                # image_url이 있는 경우 (6번째 필드)
+                image_url = None
+                if len(values) >= 6:
+                    img_val = values[5].strip()
+                    if img_val.upper() != 'NULL':
+                        image_url = img_val.strip('"').strip("'")
+
+                all_destinations.append((media_id, name, address, description, tags, image_url))
 
     return all_destinations
 
 
 def create_place_data_from_sql(destination_id: int, media_id: int, name: str,
-                                address: str, description: str, tags_str: str) -> PlaceData:
+                                address: str, description: str, tags_str: str, image_url: str = None) -> PlaceData:
     """
     SQL 데이터를 PlaceData 모델로 변환
     """
@@ -86,7 +93,7 @@ def create_place_data_from_sql(destination_id: int, media_id: int, name: str,
     )
 
 
-def init_chromadb_from_sql(sql_file_path: str = "./init.sql"):
+def init_chromadb_from_sql(sql_file_path: str = "./init_en.sql"):
     """
     init.sql 파일을 읽어서 ChromaDB에 데이터를 초기화
     """
@@ -112,14 +119,15 @@ def init_chromadb_from_sql(sql_file_path: str = "./init.sql"):
     # PlaceData 객체로 변환
     print("\n4. PlaceData 객체 변환 중...")
     places = []
-    for idx, (media_id, name, address, description, tags) in enumerate(destinations, start=1):
+    for idx, (media_id, name, address, description, tags, image_url) in enumerate(destinations, start=1):
         place = create_place_data_from_sql(
             destination_id=idx,
             media_id=media_id,
             name=name,
             address=address,
             description=description,
-            tags_str=tags
+            tags_str=tags,
+            image_url=image_url
         )
         places.append(place)
     print(f"   ✓ {len(places)}개의 PlaceData 객체 생성 완료")
@@ -145,18 +153,18 @@ def init_chromadb_from_sql(sql_file_path: str = "./init.sql"):
             media_stats[media_id] = []
         media_stats[media_id].append(place.placeName)
 
-    # SQL에서 미디어 이름 매핑 (init.sql의 INSERT INTO tb_media 참조)
+    # SQL에서 미디어 이름 매핑 (init_en.sql의 INSERT INTO tb_media 참조)
     media_names = {
-        1: "도깨비",
-        2: "케이팝 데몬 헌터스",
-        3: "미스터 션샤인",
-        4: "사랑의 불시착",
-        5: "갯마을 차차차",
-        6: "눈물의 여왕",
-        7: "폭싹 속았수다",
-        8: "이태원 클라쓰",
-        9: "그 해 우리는",
-        10: "오징어 게임"
+        1: "Guardian: The Lonely and Great God",
+        2: "K-Pop Demon Hunters",
+        3: "Mr. Sunshine",
+        4: "Crash Landing on You",
+        5: "Hometown Cha-Cha-Cha",
+        6: "Queen of Tears",
+        7: "My Sweet Mobster",
+        8: "Itaewon Class",
+        9: "Our Beloved Summer",
+        10: "Squid Game"
     }
 
     for media_id in sorted(media_stats.keys()):
@@ -185,29 +193,29 @@ def test_search_by_media_id():
 
     from app.models import SearchRequest
 
-    # 테스트 케이스 1: 도깨비 (mediaId=1)
-    print("\n[테스트 1] 도깨비 (mediaId=1) - '바다,파도,로맨틱' 태그 검색")
+    # 테스트 케이스 1: Guardian (mediaId=1)
+    print("\n[테스트 1] Guardian (mediaId=1) - 'ocean,waves,romantic' 태그 검색")
     request = SearchRequest(
         mediaId=1,
-        tags=["바다", "파도", "로맨틱"]
+        tags=["ocean", "waves", "romantic"]
     )
     results = chroma_service.search_places(request, n_results=5)
     print(f"  검색 결과 (상위 5개 placeId): {results}")
 
-    # 테스트 케이스 2: 사랑의 불시착 (mediaId=4)
-    print("\n[테스트 2] 사랑의 불시착 (mediaId=4) - '바다,해변,로맨틱' 태그 검색")
+    # 테스트 케이스 2: Crash Landing on You (mediaId=4)
+    print("\n[테스트 2] Crash Landing on You (mediaId=4) - 'ocean,beach,romantic' 태그 검색")
     request = SearchRequest(
         mediaId=4,
-        tags=["바다", "해변", "로맨틱"]
+        tags=["ocean", "beach", "romantic"]
     )
     results = chroma_service.search_places(request, n_results=5)
     print(f"  검색 결과 (상위 5개 placeId): {results}")
 
-    # 테스트 케이스 3: 갯마을 차차차 (mediaId=5)
-    print("\n[테스트 3] 갯마을 차차차 (mediaId=5) - '시장,정겨운,전통' 태그 검색")
+    # 테스트 케이스 3: Hometown Cha-Cha-Cha (mediaId=5)
+    print("\n[테스트 3] Hometown Cha-Cha-Cha (mediaId=5) - 'market,traditional,local' 태그 검색")
     request = SearchRequest(
         mediaId=5,
-        tags=["시장", "정겨운", "전통"]
+        tags=["market", "traditional", "local"]
     )
     results = chroma_service.search_places(request, n_results=5)
     print(f"  검색 결과 (상위 5개 placeId): {results}")
