@@ -28,7 +28,7 @@ class ChromaDBService:
             documents=[document],
             metadatas=[{
                 "placeId": place.placeId,
-                "contentId": place.contentId,
+                "mediaId": place.mediaId,
                 "tags": json.dumps(place.tags, ensure_ascii=False),
                 "placeName": place.placeName,
                 "location": place.location,
@@ -43,7 +43,7 @@ class ChromaDBService:
         metadatas = [
             {
                 "placeId": place.placeId,
-                "contentId": place.contentId,
+                "mediaId": place.mediaId,
                 "tags": json.dumps(place.tags, ensure_ascii=False),
                 "placeName": place.placeName,
                 "location": place.location,
@@ -58,20 +58,20 @@ class ChromaDBService:
             metadatas=metadatas
         )
 
-    def search_places(self, search_request: SearchRequest, n_results: int = 100) -> list[str]:
+    def search_places(self, search_request: SearchRequest, n_results: int = 100) -> list[int]:
         """태그 기반 유사도 검색"""
         query_text = " ".join(search_request.tags)
 
         results = self.collection.query(
             query_texts=[query_text],
-            where={"contentId": search_request.contentId},
+            where={"mediaId": search_request.mediaId},
             n_results=n_results
         )
 
         if not results["metadatas"] or not results["metadatas"][0]:
             return []
 
-        place_ids = [metadata["placeId"] for metadata in results["metadatas"][0]]
+        place_ids = [int(metadata["placeId"]) for metadata in results["metadatas"][0]]
         return place_ids
 
     def get_collection_count(self) -> int:

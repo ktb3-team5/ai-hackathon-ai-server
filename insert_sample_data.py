@@ -10,7 +10,7 @@ def create_sample_data() -> list[PlaceData]:
     sample_places = [
         PlaceData(
             placeId="1",
-            contentId="1",
+            mediaId=1,
             tags=["바다", "감성", "사진명소", "일몰", "커플", "도깨비"],
             placeName="주문진항",
             location="강원도 강릉시",
@@ -18,7 +18,7 @@ def create_sample_data() -> list[PlaceData]:
         ),
         PlaceData(
             placeId="2",
-            contentId="1",
+            mediaId=1,
             tags=["산", "힐링", "트레킹", "자연", "도깨비"],
             placeName="선자령",
             location="강원도 강릉시",
@@ -26,7 +26,7 @@ def create_sample_data() -> list[PlaceData]:
         ),
         PlaceData(
             placeId="3",
-            contentId="1",
+            mediaId=1,
             tags=["카페", "감성", "인테리어", "커플", "도깨비"],
             placeName="테라로사 커피공장",
             location="강원도 강릉시",
@@ -34,7 +34,7 @@ def create_sample_data() -> list[PlaceData]:
         ),
         PlaceData(
             placeId="4",
-            contentId="1",
+            mediaId=1,
             tags=["메밀밭", "자연", "사진명소", "힐링", "도깨비"],
             placeName="봉평 메밀밭",
             location="강원도 평창군",
@@ -42,7 +42,7 @@ def create_sample_data() -> list[PlaceData]:
         ),
         PlaceData(
             placeId="5",
-            contentId="1",
+            mediaId=1,
             tags=["해변", "바다", "산책", "일몰", "로맨틱", "도깨비"],
             placeName="경포해변",
             location="강원도 강릉시",
@@ -50,7 +50,7 @@ def create_sample_data() -> list[PlaceData]:
         ),
         PlaceData(
             placeId="6",
-            contentId="2",
+            mediaId=2,
             tags=["궁궐", "역사", "전통", "사진명소", "데이트"],
             placeName="경복궁",
             location="서울특별시 종로구",
@@ -58,7 +58,7 @@ def create_sample_data() -> list[PlaceData]:
         ),
         PlaceData(
             placeId="7",
-            contentId="2",
+            mediaId=2,
             tags=["한옥마을", "전통", "카페", "체험", "사진명소"],
             placeName="북촌 한옥마을",
             location="서울특별시 종로구",
@@ -66,7 +66,7 @@ def create_sample_data() -> list[PlaceData]:
         ),
         PlaceData(
             placeId="8",
-            contentId="2",
+            mediaId=2,
             tags=["야경", "타워", "전망대", "데이트", "로맨틱"],
             placeName="남산타워",
             location="서울특별시 용산구",

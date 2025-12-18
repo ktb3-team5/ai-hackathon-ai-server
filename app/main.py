@@ -1,11 +1,22 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.models import SearchRequest, SearchResponse
 from app.service import chroma_service
+from app.config import settings
 
 app = FastAPI(
     title="여행지 추천 API",
     description="ChromaDB를 활용한 태그 기반 여행지 추천 시스템",
     version="1.0.0"
+)
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -24,12 +35,18 @@ async def search_places(request: SearchRequest):
     """
     태그 기반 여행지 검색
 
-    - **contentId**: 콘텐츠 ID (예: "T001")
+    - **mediaId**: 미디어 ID (예: 1)
     - **tags**: 검색할 태그 리스트 (예: ["바다", "감성", "일몰"])
     """
-    place_ids = chroma_service.search_places(request)
-    return SearchResponse(placeIds=place_ids)
+    print(f"[DEBUG] Received request - mediaId: {request.mediaId}, tags: {request.tags}")
+    destination_ids = chroma_service.search_places(request)
+    print(f"[DEBUG] Found {len(destination_ids)} destinations: {destination_ids}")
+    return SearchResponse(destinationIds=destination_ids)
 
+@app.get("/api/test")
+async def test_endpoint():
+    """테스트 엔드포인트"""
+    return {"message": "테스트 엔드포인트가 정상 작동 중입니다."}
 
 @app.get("/health")
 async def health_check():
