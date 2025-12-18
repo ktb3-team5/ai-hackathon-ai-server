@@ -72,110 +72,218 @@ jobs:
           echo "✅ Docker Compose: $DOCKER_COMPOSE"
           
           # ==========================================
-          # 배포 전 디스크 공간 확보
+          # 🧹 1단계: 배포 전 공격적인 공간 확보
           # ==========================================
           echo ""
-          echo "🧹 배포 전 공간 확보 중..."
-          echo "현재 디스크 사용량:"
-          df -h / | tail -1
-          
-          # 기존 컨테이너 중지 (이미지는 보존)
+          echo "================================================"
+          echo "🧹 1단계: 배포 전 디스크 대청소"
+          echo "================================================"
           echo ""
-          echo "⏹️  기존 컨테이너 중지 중..."
+          echo "📊 현재 디스크 사용량:"
+          df -h /
+          echo ""
+          docker system df || true
+          echo ""
+          
+          # 기존 컨테이너 중지 및 삭제
+          echo "⏹️  기존 컨테이너 중지 및 삭제..."
           $DOCKER_COMPOSE down || true
           
-          # 빌드 캐시 정리 (1GB만 유지)
+          # 🔥 모든 Docker 리소스 정리 (단, 실행 중인 컨테이너 제외)
           echo ""
-          echo "🗑️  오래된 빌드 캐시 정리 중..."
-          docker builder prune --keep-storage 1GB -f || true
+          echo "🔥 Docker 완전 정리 시작..."
           
-          # 48시간 이상 된 이미지 삭제
-          echo "🗑️  오래된 이미지 정리 중..."
-          docker image prune -a --filter "until=48h" -f || true
+          # 1. 중지된 모든 컨테이너 삭제
+          echo "  - 중지된 컨테이너 삭제 중..."
+          docker container prune -f
           
-          # 중지된 컨테이너 정리
-          echo "🗑️  중지된 컨테이너 정리 중..."
-          docker container prune -f || true
+          # 2. 사용하지 않는 모든 이미지 삭제 (dangling + unused)
+          echo "  - 사용하지 않는 모든 이미지 삭제 중..."
+          docker image prune -a -f
           
-          # 정리 후 상태
+          # 3. 사용하지 않는 볼륨 삭제
+          echo "  - 사용하지 않는 볼륨 삭제 중..."
+          docker volume prune -f
+          
+          # 4. 사용하지 않는 네트워크 삭제
+          echo "  - 사용하지 않는 네트워크 삭제 중..."
+          docker network prune -f
+          
+          # 5. 모든 빌드 캐시 삭제
+          echo "  - 모든 빌드 캐시 삭제 중..."
+          docker builder prune -a -f
+          
+          # 6. /tmp 정리
+          echo "  - /tmp 임시 파일 정리 중..."
+          sudo find /tmp -type f -atime +2 -delete 2>/dev/null || true
+          
+          # 7. 로그 파일 정리 (선택사항)
+          echo "  - 오래된 로그 정리 중..."
+          sudo find /var/log -name "*.log" -type f -size +100M -delete 2>/dev/null || true
+          sudo journalctl --vacuum-size=100M 2>/dev/null || true
+          
           echo ""
-          echo "✅ 정리 완료! 현재 상태:"
-          df -h / | tail -1
-          docker system df
+          echo "✅ 정리 완료!"
+          echo ""
+          echo "📊 정리 후 디스크 상태:"
+          df -h /
+          echo ""
+          docker system df || true
           
-          # 최소 3GB 여유 공간 확인
-          AVAILABLE=$(df / | tail -1 | awk '{print $4}')
-          if [ $AVAILABLE -lt 3000000 ]; then
+          # ==========================================
+          # 🔍 2단계: 충분한 공간 확보 확인
+          # ==========================================
+          echo ""
+          echo "================================================"
+          echo "🔍 2단계: 디스크 공간 검증"
+          echo "================================================"
+          echo ""
+          
+          AVAILABLE_KB=$(df / | tail -1 | awk '{print $4}')
+          AVAILABLE_GB=$((AVAILABLE_KB / 1024 / 1024))
+          
+          echo "현재 여유 공간: ${AVAILABLE_GB}GB (${AVAILABLE_KB}KB)"
+          
+          if [ $AVAILABLE_KB -lt 3000000 ]; then
             echo ""
-            echo "⚠️  여유 공간 부족! (필요: 3GB, 현재: ${AVAILABLE}KB)"
-            echo "🧹 추가 정리 중..."
-            docker system prune -a -f
+            echo "❌ 경고: 여유 공간이 3GB 미만입니다!"
+            echo "   현재: ${AVAILABLE_GB}GB"
+            echo "   필요: 최소 3GB"
+            echo ""
+            echo "🆘 긴급 조치: 추가 정리 시도 중..."
+            
+            # 긴급 정리: 모든 이미지 강제 삭제
+            echo "  - 모든 Docker 이미지 강제 삭제..."
+            docker rmi -f $(docker images -q) 2>/dev/null || true
+            
+            # 긴급 정리: apt 캐시
+            echo "  - APT 캐시 정리..."
+            sudo apt-get clean 2>/dev/null || true
+            sudo apt-get autoclean 2>/dev/null || true
+            
             echo ""
             echo "추가 정리 후:"
-            df -h / | tail -1
+            df -h /
+            
+            AVAILABLE_KB=$(df / | tail -1 | awk '{print $4}')
+            AVAILABLE_GB=$((AVAILABLE_KB / 1024 / 1024))
+            
+            if [ $AVAILABLE_KB -lt 3000000 ]; then
+              echo ""
+              echo "❌ 치명적 오류: 여전히 공간이 부족합니다!"
+              echo "   현재: ${AVAILABLE_GB}GB"
+              echo ""
+              echo "💡 해결 방법:"
+              echo "   1. EC2 EBS 볼륨을 20GB로 확장하세요"
+              echo "   2. AWS 콘솔 → EC2 → Volumes → Modify Volume → 20GB"
+              echo "   3. EC2에서 실행:"
+              echo "      sudo growpart /dev/xvda 1"
+              echo "      sudo resize2fs /dev/xvda1"
+              echo ""
+              exit 1
+            fi
           fi
           
+          echo "✅ 충분한 공간 확보됨: ${AVAILABLE_GB}GB"
+          
           # ==========================================
-          # BuildKit 활성화 및 빌드
+          # 🔧 3단계: BuildKit 활성화
           # ==========================================
           echo ""
-          echo "🔧 BuildKit 활성화..."
+          echo "================================================"
+          echo "🔧 3단계: BuildKit 활성화"
+          echo "================================================"
+          echo ""
+          
           export DOCKER_BUILDKIT=1
           export COMPOSE_DOCKER_CLI_BUILD=1
           
-          # Docker 이미지 빌드
+          echo "✅ DOCKER_BUILDKIT=1"
+          echo "✅ COMPOSE_DOCKER_CLI_BUILD=1"
+          
+          # ==========================================
+          # 🔨 4단계: Docker 이미지 빌드
+          # ==========================================
           echo ""
-          echo "🔨 Docker 이미지 빌드 중... (3-5분 소요)"
-          echo "   - requirements.txt 경량화로 70% 시간 단축!"
+          echo "================================================"
+          echo "🔨 4단계: Docker 이미지 빌드"
+          echo "================================================"
+          echo ""
+          echo "⏳ 빌드 시작... (3-5분 예상)"
+          echo "   - requirements.txt 경량화로 70% 시간 단축"
+          echo "   - BuildKit으로 20% 추가 향상"
+          echo ""
+          
+          BUILD_START=$(date +%s)
+          
           $DOCKER_COMPOSE build --build-arg BUILDKIT_INLINE_CACHE=1
           
+          BUILD_END=$(date +%s)
+          BUILD_TIME=$((BUILD_END - BUILD_START))
+          BUILD_MIN=$((BUILD_TIME / 60))
+          BUILD_SEC=$((BUILD_TIME % 60))
+          
           echo ""
-          echo "✅ 빌드 완료!"
+          echo "✅ 빌드 완료! (소요 시간: ${BUILD_MIN}분 ${BUILD_SEC}초)"
           
           # ==========================================
-          # ChromaDB 초기화
+          # 📦 5단계: ChromaDB 초기화
           # ==========================================
+          echo ""
+          echo "================================================"
+          echo "📦 5단계: ChromaDB 초기화"
+          echo "================================================"
+          echo ""
+          
           if [ ! -d "./chroma_db" ] || [ -z "$(ls -A ./chroma_db 2>/dev/null)" ]; then
-            echo ""
             echo "📦 ChromaDB 초기화 중..."
             $DOCKER_COMPOSE run --rm ai-server python init_chroma_from_sql.py
             echo "✅ ChromaDB 초기화 완료"
           else
-            echo ""
             echo "✅ ChromaDB 데이터 존재 (초기화 건너뜀)"
           fi
           
           # ==========================================
-          # 컨테이너 시작
+          # ▶️ 6단계: 컨테이너 시작
           # ==========================================
           echo ""
-          echo "▶️  컨테이너 시작 중..."
+          echo "================================================"
+          echo "▶️  6단계: 컨테이너 시작"
+          echo "================================================"
+          echo ""
+          
           $DOCKER_COMPOSE up -d
           
-          # 서버 시작 대기
-          echo ""
           echo "⏳ 서버 시작 대기 중..."
           sleep 15
           
-          # 로그 확인
+          # ==========================================
+          # ✅ 7단계: 배포 검증
+          # ==========================================
           echo ""
+          echo "================================================"
+          echo "✅ 7단계: 배포 검증"
+          echo "================================================"
+          echo ""
+          
           echo "📋 최근 로그:"
           $DOCKER_COMPOSE logs --tail=30
           
-          # 컨테이너 상태
           echo ""
           echo "📊 컨테이너 상태:"
           $DOCKER_COMPOSE ps
           
-          # 최종 디스크 상태
           echo ""
           echo "💾 최종 디스크 상태:"
-          df -h / | tail -1
+          df -h /
           docker system df
           
+          # ==========================================
+          # 🎉 배포 완료
+          # ==========================================
           echo ""
           echo "=========================================="
-          echo "✅ 배포 완료!"
+          echo "🎉 배포 완료!"
           echo "=========================================="
           echo ""
           echo "📍 서버 접속 정보:"
@@ -183,8 +291,10 @@ jobs:
           echo "   - 문서: http://3.34.178.178:8000/docs"
           echo "   - 헬스: http://3.34.178.178:8000/health"
           echo ""
-          echo "💡 서버 확인: curl http://3.34.178.178:8000/health"
-          echo "💡 로그 확인: docker-compose logs -f"
+          echo "💡 명령어:"
+          echo "   - 로그 확인: docker-compose logs -f"
+          echo "   - 컨테이너 상태: docker-compose ps"
+          echo "   - 디스크 확인: df -h"
           echo ""
         ENDSSH
 
@@ -196,14 +306,13 @@ jobs:
         echo "=========================================="
         echo ""
         echo "✨ 주요 개선 사항:"
-        echo "  - requirements.txt 70% 경량화 (torch GPU → CPU)"
-        echo "  - 자동 디스크 정리 (빌드 캐시, 오래된 이미지)"
-        echo "  - BuildKit 활성화로 20% 빌드 속도 향상"
+        echo "  - 배포 전 Docker 완전 정리"
+        echo "  - requirements.txt 70% 경량화"
+        echo "  - BuildKit 활성화"
+        echo "  - 최소 3GB 공간 보장"
         echo ""
-        echo "📊 예상 빌드 시간:"
-        echo "  - 첫 배포: 3-5분 (기존 15분 대비 70% 단축)"
-        echo "  - 코드 수정: 10-30초 (95% 단축)"
+        echo "📊 예상 빌드 시간: 3-5분"
         echo ""
-        echo "서버 상태 확인:"
+        echo "서버 확인:"
         echo "  curl http://${{ secrets.EC2_HOST }}:8000/health"
         echo ""
