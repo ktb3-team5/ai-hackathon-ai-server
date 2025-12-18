@@ -4,21 +4,28 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # 앱 설정
-    app_env: str = "development"
-    debug: bool = False
-    host: str = "0.0.0.0"
-    port: int = 8000
+    APP_ENV: str = "development"
+    DEBUG: bool = True
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
 
     # Google Gemini
-    google_api_key: str
-    gemini_model: str = "gemini-1.5-flash"
-    gemini_temperature: float = 0.7
+    # google_api_key: str
+    # gemini_model: str = "gemini-1.5-flash"
+    # gemini_temperature: float = 0.7
 
     # Redis (선택)
-    redis_url: str | None = None
+    # redis_url: str | None = None
 
     # CORS
     allowed_origins: str = "*"
+
+    # 추천 시스템
+    CHROMA_DB_PATH: str = "./chroma_db"
+    CHROMA_COLLECTION_NAME: str = "travel_places"
+    EMBEDDING_MODEL: str = "jhgan/ko-sroberta-multitask"
+    # recommendation_top_k: int = 5
+    # similar_users_count: int = 5
 
     @property
     def cors_origins(self) -> list[str]:
@@ -38,3 +45,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()
