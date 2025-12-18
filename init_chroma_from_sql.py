@@ -86,7 +86,7 @@ def create_place_data_from_sql(destination_id: int, media_id: int, name: str,
     )
 
 
-def init_chromadb_from_sql(sql_file_path: str = "./init.sql"):
+def init_chromadb_from_sql(sql_file_path: str = "./init_en.sql"):
     """
     init.sql 파일을 읽어서 ChromaDB에 데이터를 초기화
     """
