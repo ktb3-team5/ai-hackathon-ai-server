@@ -1,11 +1,20 @@
+# ========================================
+# 핵심 서버 패키지
+# ========================================
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 pydantic==2.5.3
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
-langchain==0.1.4
-langchain-google-genai==0.0.11
-redis==5.0.1
-gunicorn==21.2.0
+
+# ========================================
+# ChromaDB 및 벡터 검색
+# ========================================
 chromadb==0.4.22
 sentence-transformers==2.3.1
+
+# sentence-transformers가 자동으로 설치하는 의존성:
+# - torch (CPU 버전, 경량)
+# - transformers
+# - huggingface-hub
+# 별도 명시 불필요!
