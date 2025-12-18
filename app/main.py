@@ -38,14 +38,8 @@ async def search_places(request: SearchRequest):
     - **mediaId**: 미디어 ID (예: 1)
     - **tags**: 검색할 태그 리스트 (예: ["바다", "감성", "일몰"])
     """
-    # print(f"[DEBUG] Received request - mediaId: {request.mediaId}, tags: {request.tags}")
     destination_ids = chroma_service.search_places(request)
-    # print(f"[DEBUG] Found {len(destination_ids)} destinations: {destination_ids}")
-
     response = SearchResponse(destinationIds=destination_ids)
-    # print(f"[DEBUG] Response object: {response}")
-    # print(f"[DEBUG] Response JSON: {response.model_dump_json()}")
-
     return response
 
 @app.get("/api/test")

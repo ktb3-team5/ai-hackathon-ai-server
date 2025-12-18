@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS db_ai_local;
-USE db_ai_local;
+CREATE DATABASE IF NOT EXISTS KTB_DB;
+USE KTB_DB;
 -- =========================================================
 -- 1) TABLE DDL
 -- =========================================================
