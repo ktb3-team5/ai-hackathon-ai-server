@@ -62,7 +62,7 @@ class ChromaDBService:
         """태그 기반 유사도 검색"""
         query_text = " ".join(search_request.tags)
 
-        print(f"[DEBUG] Searching with mediaId={search_request.mediaId}, type={type(search_request.mediaId)}")
+        # print(f"[DEBUG] Searching with mediaId={search_request.mediaId}, type={type(search_request.mediaId)}")
 
         results = self.collection.query(
             query_texts=[query_text],
@@ -74,13 +74,14 @@ class ChromaDBService:
         # print(f"[DEBUG] Metadatas: {results.get('metadatas', [])}")
 
         if not results["metadatas"] or not results["metadatas"][0]:
-            print(f"[DEBUG] No results found. Trying without where clause...")
+            # print(f"[DEBUG] No results found. Trying without where clause...")
             # where 조건 없이 검색
             results_no_where = self.collection.query(
                 query_texts=[query_text],
                 n_results=n_results
+
             )
-            print(f"[DEBUG] Results without where: {results_no_where.get('metadatas', [])}")
+            # print(f"[DEBUG] Results without where: {results_no_where.get('metadatas', [])}")
             return []
 
         place_ids = [int(metadata["placeId"]) for metadata in results["metadatas"][0]]
