@@ -1,6 +1,5 @@
 # ai-server
 
-
 ## API 문서
 
 - Swagger UI: http://localhost:8000/docs (개발 환경에서만)
